@@ -118,17 +118,15 @@ class CarreIdentity:
         return hasattr(__o, '_picture') and __o._picture == self._picture and __o._color == self._color
 
     def draw(self, screen:'Surface', position : 'Point') -> None:
-        position = position.getPoint()
+        position        = position.getPoint()
+        primaryColor    = self._color.getPrimaryColors()
 
-        if self._picture is None:
-            primaryColor    = self._color.getPrimaryColors()
-
-            pygame.draw.rect(
-                screen,
-                ( primaryColor['red'], primaryColor['green'], primaryColor['blue'] ),
-                ( position['x'], position['y'], CARRE_SIZE, CARRE_SIZE )
-            )
-        else:
+        pygame.draw.rect(
+            screen,
+            ( primaryColor['red'], primaryColor['green'], primaryColor['blue'] ),
+            ( position['x'], position['y'], CARRE_SIZE, CARRE_SIZE )
+        )
+        if self._picture is not None:
             screen.blit(self._picture, (position['x'], position['y']))
 
 class Digit(int):
@@ -192,13 +190,17 @@ class Carre():
         self._identity.draw(screen=screen, position=self._position)
 
     def isDisplay(self) -> bool:
-        return self.isBlack() and self.isFlaged()
+        return not self.isBlack() and not self.isFlaged()
 
     def isFlaged(self) -> bool:
         return self._identity == IdentityFlag()
 
     def isBlack(self) -> bool:
         return self._identity == IdentityBlack()
+
+    def isMine(self) -> bool:
+        toto = self._identity == IdentityMine()
+        return self._identity == IdentityMine()
 
 class MineSchemaType(int):
 
@@ -228,22 +230,38 @@ class Coord:
     def displaySlot(self, gridValue: List['SlotLine']) -> None:
         gridValue[self._coordY].displaySlotByCoord(coordX=self._coordX)
 
-    def retrieveProximityCoord(self, gridSize: 'PositiveInt') -> List['Coord']:
+    # à refacto
+    def retrieveProximityCoord(self, gridSize: 'PositiveInt', justDirect: bool = False) -> List['Coord']:
         proximityCoords = []
 
-        # line before
-        if self._coordY > 0:
-            for x in [self._coordX - 1, self._coordX, self._coordX + 1]:
-                if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY - 1))
+        if justDirect:
+            # line before
+            if self._coordY > 0:
+                proximityCoords.append(Coord(coordX=self._coordX, coordY=self._coordY - 1))
 
-        # currentLine
-        for x in [self._coordX - 1, self._coordX + 1]:
-            if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY))
+            # currentLine
+            for x in [self._coordX - 1, self._coordX + 1]:
+                if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY))
 
-        # line after
-        if self._coordY < gridSize - 1 :
-            for x in [self._coordX - 1, self._coordX, self._coordX + 1]:
-                if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY + 1))
+            # line after
+            if self._coordY < gridSize - 1 :
+                proximityCoords.append(Coord(coordX=self._coordX, coordY=self._coordY + 1))
+
+            test = "toto"
+        else:
+            # line before
+            if self._coordY > 0:
+                for x in [self._coordX - 1, self._coordX, self._coordX + 1]:
+                    if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY - 1))
+
+            # currentLine
+            for x in [self._coordX - 1, self._coordX + 1]:
+                if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY))
+
+            # line after
+            if self._coordY < gridSize - 1 :
+                for x in [self._coordX - 1, self._coordX, self._coordX + 1]:
+                    if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY + 1))
 
         return proximityCoords
 
@@ -256,6 +274,9 @@ class Coord:
 
     def slotIsDiplay(self, gridValue: List['SlotLine']) -> bool:
         return gridValue[self._coordY]._value[self._coordX].isDisplay()
+
+    def slotIsMine(self, gridValue: List['SlotLine']) -> bool:
+        return gridValue[self._coordY]._value[self._coordX].isMine()
 
     def toggleFlag(self, gridValue: List['SlotLine']) -> None:
         gridValue[self._coordY]._value[self._coordX].toggleFlag()
@@ -289,6 +310,9 @@ class Slot:
 
     def isBlack(self) -> bool:
         return self._carre.isBlack()
+
+    def isMine(self) -> bool:
+        return self._carre.isMine()
 
 class SlotMine(Slot):
 
@@ -373,6 +397,12 @@ class Grid:
 
         Coord(coordX=coordX, coordY=coordY).toggleFlag(gridValue=self._value)
 
+    def isMine(self, clickPosition:'Point') -> None:
+        coordX, coordY = self._getCoordsFromPoint(point=clickPosition)
+        if coordX is None or coordY is None: return
+
+        return Coord(coordX=coordX, coordY=coordY).slotIsMine(gridValue=self._value)
+
     def haveBlackSlot(self) -> bool:
         for slotLine in self._value:
             if slotLine.haveBlackSlot(): return True
@@ -383,10 +413,11 @@ class Grid:
         # recurence here
         coord.displaySlot(gridValue=self._value)
         if coord.getSchemaValue(mineSchema=self._mineSchema) == 0:
-            proximityCoords = coord.retrieveProximityCoord(gridSize=len(self._mineSchema))
+            proximityCoords = coord.retrieveProximityCoord(gridSize=len(self._mineSchema), justDirect=True)
             for proximityCoord in proximityCoords:
                 if not proximityCoord.slotIsDiplay(gridValue=self._value):
                     self._displaySlot(coord=proximityCoord)
+                    # proximityCoord.displaySlot(gridValue=self._value)
 
     def _createMineSchema(self, gridSize: 'PositiveInt', mineCount: 'PositiveInt') -> List[List['MineSchemaType']]:
         slotCount = gridSize * gridSize
@@ -457,6 +488,10 @@ class GameData:
         if not self._grid.haveBlackSlot():
             self._displayAll()
 
+    def displayAllIfMine(self, clickPosition:'Point') -> None:
+        if self._grid.isMine(clickPosition=clickPosition):
+            self._displayAll()
+
 # Initialiser Pygame
 pygame.init()
 
@@ -482,6 +517,7 @@ while running:
             if event.button == 3: # right click
                 gameData.toggleFlag(clickPosition=clickPosition)
 
+            gameData.displayAllIfMine(clickPosition=clickPosition)
             gameData.displayAllIfWin()
 
     # Mettre à jour l'affichage
