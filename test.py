@@ -22,29 +22,6 @@ class ByteInt(int):
             raise ValueError("ByteInt types must be between 0 and 255")
         return  super(cls, cls).__new__(cls, value)
 
-class QuadrilateralSize:
-
-    _x: 'PositiveInt'
-    _y: 'PositiveInt'
-
-    def __init__(self, x:'PositiveInt', y:'PositiveInt') -> None:
-        self._x = x
-        self._y = y
-
-    def __eq__(self, __o: object) -> bool:
-        return __o._x == self._x and __o._y == self._y
-
-    def getSize(self) -> Dict[str, 'PositiveInt']:
-        return {
-            'x': self._x,
-            'y': self._y
-        }
-
-class CarreSize(QuadrilateralSize):
-
-    def __init__(self, size:'PositiveInt') -> None:
-        super().__init__(x=size, y=size)
-
 class Color:
 
     _red     : 'ByteInt'
@@ -92,7 +69,7 @@ class OfficialPicture():
 
     _value      : 'Surface'
     _original   : 'Surface'
-    
+
     def __init__(self, type:'OfficialCarreType') -> None:
 
         specialPictureDict = {
@@ -122,37 +99,64 @@ class OfficialPicture():
         return self._value
 
 OFFICIAL_PICTURE = {officialType: OfficialPicture(officialType).getPicture() for officialType in range(-3, 9)}
+OFFICIAL_PICTURE[OfficialCarreType.BLACK] = None
 
-class QuadrilateralIdentity:
+class CarreIdentity:
 
-    _size   :'QuadrilateralSize'
-    _color  :'Color'
-
-    def __init__(self, size:'QuadrilateralSize', color:'Color') -> None:
-        self._size = size
-        self._color = color
-
-    def __eq__(self, __o: object) -> bool:
-        return __o._size == self._size and __o._color == self._color
-
-    def getColor(self) -> Dict[str, 'ByteInt']:
-        return self._color.getPrimaryColors()
-
-    def getSize(self) -> Dict[str, 'PositiveInt']:
-        return self._size.getSize()
-
-class CarreIdentity(QuadrilateralIdentity):
+    _color  : 'Color'
+    _picture: 'Surface'
 
     def __init__(
             self,
-            size: 'CarreSize',
-            color: 'Color' = Color(
-                red     = ByteInt(0),
-                green   = ByteInt(0),
-                blue    = ByteInt(0)
-            )
+            color   : 'Color'               = ColorBlack(),
+            type    : 'OfficialCarreType'   = OfficialCarreType.BLACK
         ) -> None:
-        super().__init__(size=size, color=color)
+        self._picture   = OFFICIAL_PICTURE[type]
+        self._color     = color
+
+    def __eq__(self, __o: object) -> bool:
+        return hasattr(__o, '_picture') and __o._picture == self._picture and __o._color == self._color
+
+    def draw(self, screen:'Surface', position : 'Point') -> None:
+        position = position.getPoint()
+
+        if self._picture is None:
+            primaryColor    = self._color.getPrimaryColors()
+
+            pygame.draw.rect(
+                screen,
+                ( primaryColor['red'], primaryColor['green'], primaryColor['blue'] ),
+                ( position['x'], position['y'], CARRE_SIZE, CARRE_SIZE )
+            )
+        else:
+            screen.blit(self._picture, (position['x'], position['y']))
+
+class Digit(int):
+
+    def __new__(cls, value, *args, **kwargs) -> 'Digit':
+        if value not in range(10):
+            raise ValueError("not digit value")
+        return  super(cls, cls).__new__(cls, value)
+
+class IdentityBlack(CarreIdentity):
+
+    def __init__(self) -> None:
+        super().__init__()
+
+class IdentityMine(CarreIdentity):
+
+    def __init__(self) -> None:
+        super().__init__(type=OfficialCarreType.MINE)
+
+class IdentityFlag(CarreIdentity):
+
+    def __init__(self) -> None:
+        super().__init__(type=OfficialCarreType.FLAG)
+
+class IdentityNumber(CarreIdentity):
+
+    def __init__(self, number: 'Digit') -> None:
+        super().__init__(type=number)
 
 class Point:
 
@@ -172,78 +176,32 @@ class Point:
             'y': self._y
         }
 
-class Quadrilateral:
-    _identity: 'QuadrilateralIdentity'
+class Carre():
+
+    _identity: 'CarreIdentity'
     _position: 'Point'
 
-    def __init__(self, identity: 'QuadrilateralIdentity', position: 'Point') -> None:
+    def __init__(self, position: 'Point', identity: 'CarreIdentity' = CarreIdentity()) -> None:
         self._identity = identity
         self._position = position
 
     def __eq__(self, __o: object) -> bool:
         return __o._identity == self._identity and __o._position == self._position
 
-    def changePosition(self, newPosition:'Point') -> None:
-        self._position = newPosition
-
     def draw(self, screen:'Surface') -> None:
+        self._identity.draw(screen=screen, position=self._position)
 
-        primaryColor    = self._identity.getColor()
-        size            = self._identity.getSize()
-        position        = self._position.getPoint()
+    def isDisplay(self) -> bool:
+        return self.isBlack() and self.isFlaged()
 
-        pygame.draw.rect(
-            screen,
-            ( primaryColor['red'], primaryColor['green'], primaryColor['blue'] ),
-            ( position['x'], position['y'], size['x'], size['y'] )
-        )
+    def isFlaged(self) -> bool:
+        return self._identity == IdentityFlag()
 
-class Carre(Quadrilateral):
-
-    def __init__(self, identity: 'CarreIdentity', position: 'Point') -> None:
-        super().__init__(identity=identity, position=position)
-
-class CarrePicture(Carre):
-
-    _picture: 'Surface'
-
-    def __init__(self, identity: 'CarreIdentity', position: 'Point', type:'OfficialCarreType') -> None:
-        super().__init__(identity, position)
-        self._picture = OFFICIAL_PICTURE[type]
-
-    def __eq__(self, __o: object) -> bool:
-        return hasattr(__o, '_picture') and __o._picture == self._picture
-
-    def draw(self, screen:'Surface') -> None:
-        super().draw(screen=screen)
-
-        position    = self._position.getPoint()
-        screen.blit(self._picture, (position['x'], position['y']))
-
-class CarreMine(CarrePicture):
-
-    def __init__(self, identity: 'CarreIdentity', position: 'Point') -> None:
-        super().__init__(identity=identity, position=position, type=OfficialCarreType.MINE)
-
-class CarreFlag(CarrePicture):
-
-    def __init__(self, identity: 'CarreIdentity', position: 'Point') -> None:
-        super().__init__(identity=identity, position=position, type=OfficialCarreType.FLAG)
-
-class Digit(int):
-
-    def __new__(cls, value, *args, **kwargs) -> 'Digit':
-        if value not in range(10):
-            raise ValueError("not digit value")
-        return  super(cls, cls).__new__(cls, value)
-
-class CarreNumber(CarrePicture):
-
-    def __init__(self, identity: 'CarreIdentity', position: 'Point', number: 'Digit') -> None:
-        super().__init__(identity=identity, position=position, type=number)
+    def isBlack(self) -> bool:
+        return self._identity == IdentityBlack()
 
 class MineSchemaType(int):
-    
+
     def __new__(cls, value, *args, **kwargs) -> 'MineSchemaType':
         rangeExpected = range(-1, 9)
         if value not in rangeExpected:
@@ -258,24 +216,14 @@ class Coord:
         self._coordX = coordX
         self._coordY = coordY
 
-    def _createCarreIdentity(self, color: 'Color'=ColorBlack()) -> 'CarreIdentity':
-        return CarreIdentity(size=CarreSize(size=CARRE_SIZE), color=color)
-
     def _createCarrePosition(self) -> 'Point':
         x = PositiveInt(self._carrePositionCalcul(self._coordX))
         y = PositiveInt(self._carrePositionCalcul(self._coordY))
 
         return Point(x=x, y=y)
 
-    def createCarre(self, type:'OfficialCarreType') -> 'Carre':
-        if type == OfficialCarreType.FLAG:
-            return CarreFlag(identity=self._createCarreIdentity(), position=self._createCarrePosition())
-        if type == OfficialCarreType.MINE:
-            return CarreMine(identity=self._createCarreIdentity(), position=self._createCarrePosition())
-        if type == OfficialCarreType.BLACK:
-            return Carre(identity=self._createCarreIdentity(), position=self._createCarrePosition())
-        if type in range(9):
-            return CarreNumber(identity=self._createCarreIdentity(), position=self._createCarrePosition(), number=Digit(type))
+    def createCarre(self, carreIdentity:'CarreIdentity') -> 'Carre':
+        return Carre(position=self._createCarrePosition(), identity=carreIdentity)
 
     def displaySlot(self, gridValue: List['SlotLine']) -> None:
         gridValue[self._coordY].displaySlotByCoord(coordX=self._coordX)
@@ -306,17 +254,8 @@ class Coord:
     def getSchemaValue(self, mineSchema=List[List[MineSchemaType]]) -> 'MineSchemaType':
         return mineSchema[self._coordY][self._coordX]
 
-    def carreIsDisplay(self, carre: 'Carre')-> bool:
-        return carre not in [
-            Carre(identity=self._createCarreIdentity(), position=self._createCarrePosition()),
-            CarreFlag(identity=self._createCarreIdentity(), position=self._createCarrePosition())
-        ]
-
     def slotIsDiplay(self, gridValue: List['SlotLine']) -> bool:
         return gridValue[self._coordY]._value[self._coordX].isDisplay()
-
-    def slotIsFlaged(self, carre: 'Carre')-> bool:
-        return carre == CarreFlag(identity=self._createCarreIdentity(), position=self._createCarrePosition())
 
     def toggleFlag(self, gridValue: List['SlotLine']) -> None:
         gridValue[self._coordY]._value[self._coordX].toggleFlag()
@@ -330,7 +269,7 @@ class Slot:
 
     def __init__(self, coord: 'Coord') -> None:
         self._coord = coord
-        self._carre = coord.createCarre(type=OfficialCarreType.BLACK)
+        self._carre = coord.createCarre(carreIdentity=IdentityBlack())
 
     def draw(self, screen:'Surface') -> None:
         self._carre.draw(screen=screen)
@@ -339,20 +278,22 @@ class Slot:
         pass
 
     def isDisplay(self) -> bool:
-        return self._coord.carreIsDisplay(carre=self._carre)
+        return self._carre.isDisplay()
 
     def toggleFlag(self) -> None:
         if self.isDisplay(): return
-        if not self._coord.slotIsFlaged(carre=self._carre):
-            self._carre = self._coord.createCarre(type=OfficialCarreType.FLAG)
+        if not self._carre.isFlaged():
+            self._carre = self._coord.createCarre(carreIdentity=IdentityFlag())
         else:
-            self._carre = self._coord.createCarre(type=OfficialCarreType.BLACK)
+            self._carre = self._coord.createCarre(carreIdentity=IdentityBlack())
 
+    def isBlack(self) -> bool:
+        return self._carre.isBlack()
 
 class SlotMine(Slot):
 
     def display(self) -> None:
-        self._carre = self._coord.createCarre(type=OfficialCarreType.MINE)
+        self._carre = self._coord.createCarre(carreIdentity=IdentityMine())
 
 class SlotEmpty(Slot):
 
@@ -363,7 +304,7 @@ class SlotEmpty(Slot):
         super().__init__(coord)
 
     def display(self) -> None:
-        self._carre = self._coord.createCarre(type=self._mineCountAtProximity)
+        self._carre = self._coord.createCarre(carreIdentity=IdentityNumber(number=self._mineCountAtProximity))
 
 class SlotLine:
     _value: List['Slot']
@@ -388,6 +329,11 @@ class SlotLine:
     def displayAll(self) -> None:
         for slot in self._value:
             slot.display()
+
+    def haveBlackSlot(self) -> bool:
+        for slot in self._value:
+            if slot.isBlack(): return True
+        return False
 
 class Grid:
     _value      : List['SlotLine']
@@ -426,6 +372,11 @@ class Grid:
         if coordX is None or coordY is None: return
 
         Coord(coordX=coordX, coordY=coordY).toggleFlag(gridValue=self._value)
+
+    def haveBlackSlot(self) -> bool:
+        for slotLine in self._value:
+            if slotLine.haveBlackSlot(): return True
+        return False
 
     def _displaySlot(self, coord: 'Coord') -> None:
 
@@ -496,11 +447,15 @@ class GameData:
     def displaySlotByClick(self, clickPosition:'Point') -> None:
         self._grid.displaySlotByClick(clickPosition=clickPosition)
 
-    def displayAll(self) -> None:
+    def _displayAll(self) -> None:
         self._grid.displayAll()
 
     def toggleFlag(self, clickPosition:'Point') -> None:
         self._grid.toggleFlag(clickPosition=clickPosition)
+
+    def displayAllIfWin(self) -> None:
+        if not self._grid.haveBlackSlot():
+            self._displayAll()
 
 # Initialiser Pygame
 pygame.init()
@@ -522,10 +477,12 @@ while running:
 
             if event.button == 1: # left click
                 gameData.displaySlotByClick(clickPosition=clickPosition)
-                #gameData.displayAll()
+
 
             if event.button == 3: # right click
                 gameData.toggleFlag(clickPosition=clickPosition)
+
+            gameData.displayAllIfWin()
 
     # Mettre à jour l'affichage
     gameData.draw()
