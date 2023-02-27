@@ -235,38 +235,22 @@ class Coord:
     def displaySlot(self, gridValue: List['SlotLine']) -> None:
         gridValue[self._coordY].displaySlotByCoord(coordX=self._coordX)
 
-    # à refacto
-    def retrieveProximityCoord(self, gridSize: 'PositiveInt', justDirect: bool = False) -> List['Coord']:
+    def retrieveProximityCoord(self, gridSize: 'PositiveInt') -> List['Coord']:
         proximityCoords = []
 
-        if justDirect:
-            # line before
-            if self._coordY > 0:
-                proximityCoords.append(Coord(coordX=self._coordX, coordY=self._coordY - 1))
+        # line before
+        if self._coordY > 0:
+            for x in [self._coordX - 1, self._coordX, self._coordX + 1]:
+                if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY - 1))
 
-            # currentLine
-            for x in [self._coordX - 1, self._coordX + 1]:
-                if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY))
+        # currentLine
+        for x in [self._coordX - 1, self._coordX + 1]:
+            if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY))
 
-            # line after
-            if self._coordY < gridSize - 1 :
-                proximityCoords.append(Coord(coordX=self._coordX, coordY=self._coordY + 1))
-
-            test = "toto"
-        else:
-            # line before
-            if self._coordY > 0:
-                for x in [self._coordX - 1, self._coordX, self._coordX + 1]:
-                    if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY - 1))
-
-            # currentLine
-            for x in [self._coordX - 1, self._coordX + 1]:
-                if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY))
-
-            # line after
-            if self._coordY < gridSize - 1 :
-                for x in [self._coordX - 1, self._coordX, self._coordX + 1]:
-                    if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY + 1))
+        # line after
+        if self._coordY < gridSize - 1 :
+            for x in [self._coordX - 1, self._coordX, self._coordX + 1]:
+                if x in range(gridSize): proximityCoords.append(Coord(coordX=x, coordY=self._coordY + 1))
 
         return proximityCoords
 
@@ -436,7 +420,7 @@ class Grid:
         # recurence here
         coord.displaySlot(gridValue=self._value)
         if coord.getSchemaValue(mineSchema=self._mineSchema) == 0:
-            proximityCoords = coord.retrieveProximityCoord(gridSize=len(self._mineSchema), justDirect=True)
+            proximityCoords = coord.retrieveProximityCoord(gridSize=len(self._mineSchema))
             for proximityCoord in proximityCoords:
                 if not proximityCoord.slotIsDiplay(gridValue=self._value):
                     self._displaySlot(coord=proximityCoord)
@@ -520,8 +504,8 @@ class GameData:
 pygame.init()
 
 # initier une grille
-gridSize    = PositiveInt(30)
-mineCount   = PositiveInt(50)
+gridSize    = PositiveInt(20)
+mineCount   = PositiveInt(60)
 gameData    = GameData(gridSize=gridSize, mineCount=mineCount)
 
 running = True
