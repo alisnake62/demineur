@@ -146,6 +146,11 @@ class IdentityMine(CarreIdentity):
     def __init__(self) -> None:
         super().__init__(type=OfficialCarreType.MINE)
 
+class IdentityMineExplosed(CarreIdentity):
+
+    def __init__(self) -> None:
+        super().__init__(type=OfficialCarreType.MINE_EXPLOSED)
+
 class IdentityFlag(CarreIdentity):
 
     def __init__(self) -> None:
@@ -281,6 +286,9 @@ class Coord:
     def toggleFlag(self, gridValue: List['SlotLine']) -> None:
         gridValue[self._coordY]._value[self._coordX].toggleFlag()
 
+    def explose(self, gridValue: List['SlotLine']) -> None:
+        gridValue[self._coordY]._value[self._coordX].explose()
+
     def _carrePositionCalcul(self, cardinal: 'PositiveInt') -> 'PositiveInt':
         return PositiveInt(cardinal * CARRE_SIZE + (1 + cardinal) * GRID_SEPARATOR_SIZE)
 
@@ -313,11 +321,20 @@ class Slot:
 
     def isMine(self) -> bool:
         return self._carre.isMine()
+    
+    def explose(self) -> None:
+        pass
 
 class SlotMine(Slot):
 
+    _isExplosed: bool = False
+
     def display(self) -> None:
-        self._carre = self._coord.createCarre(carreIdentity=IdentityMine())
+        identity = IdentityMineExplosed() if self._isExplosed else IdentityMine()
+        self._carre = self._coord.createCarre(carreIdentity=identity)
+
+    def explose(self) -> None:
+        self._isExplosed = True
 
 class SlotEmpty(Slot):
 
@@ -397,11 +414,17 @@ class Grid:
 
         Coord(coordX=coordX, coordY=coordY).toggleFlag(gridValue=self._value)
 
-    def isMine(self, clickPosition:'Point') -> None:
+    def isMine(self, clickPosition:'Point') -> bool:
         coordX, coordY = self._getCoordsFromPoint(point=clickPosition)
         if coordX is None or coordY is None: return
 
         return Coord(coordX=coordX, coordY=coordY).slotIsMine(gridValue=self._value)
+    
+    def exploseMine(self, clickPosition:'Point') -> None:
+        coordX, coordY = self._getCoordsFromPoint(point=clickPosition)
+        if coordX is None or coordY is None: return
+
+        Coord(coordX=coordX, coordY=coordY).explose(gridValue=self._value)
 
     def haveBlackSlot(self) -> bool:
         for slotLine in self._value:
@@ -490,14 +513,15 @@ class GameData:
 
     def displayAllIfMine(self, clickPosition:'Point') -> None:
         if self._grid.isMine(clickPosition=clickPosition):
+            self._grid.exploseMine(clickPosition=clickPosition)
             self._displayAll()
 
 # Initialiser Pygame
 pygame.init()
 
 # initier une grille
-gridSize    = PositiveInt(10)
-mineCount   = PositiveInt(10)
+gridSize    = PositiveInt(30)
+mineCount   = PositiveInt(50)
 gameData    = GameData(gridSize=gridSize, mineCount=mineCount)
 
 running = True
